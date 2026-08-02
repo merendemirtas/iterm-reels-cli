@@ -2,19 +2,18 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 
 REELS_FILE = "reels.txt"
 
 def clear_screen():
-    """Terminal ekranını ve geçmiş tamponu tamamen temizler."""
+    """Terminal ekranını ve tampon geçmişini temizler."""
     print("\033c", end="")
 
 def load_reels(file_path):
-    """reels.txt dosyasından geçerli Instagram Reels linklerini okur."""
+    """reels.txt dosyasından Reels linklerini okur."""
     if not os.path.exists(file_path):
         print(f"[!] Hata: '{file_path}' dosyası bulunamadı.")
-        print(f"[+] Lütfen projede '{file_path}' oluşturup linkleri ekleyin.")
+        print(f"[+] Lütfen '{file_path}' dosyası oluşturup linkleri ekleyin.")
         sys.exit(1)
         
     with open(file_path, "r", encoding="utf-8") as f:
@@ -27,9 +26,8 @@ def load_reels(file_path):
     return links
 
 def get_terminal_geometry():
-    """iTerm2 pencere boyutuna göre timg için uygun piksel/hücre boyutunu hesaplar."""
+    """iTerm2 pencere boyutuna göre timg çözünürlüğünü dinamik ayarlar."""
     columns, lines = shutil.get_terminal_size((80, 24))
-    # Terminal boyutuna dinamik uyum sağlama (genişlik x yükseklik)
     width = max(40, int(columns * 0.75))
     height = max(20, int(lines * 0.75))
     return f"{width}x{height}"
@@ -48,10 +46,8 @@ def play_stream():
             print(" 🕹️  [ENTER] -> Sonraki Video | [q + ENTER] -> Çıkış")
             print("=" * 60 + "\n")
             
-            # yt-dlp ve timg süreçlerini tam sessiz ve optimize şekilde çalıştır
             cmd = f'exec yt-dlp -q --no-warnings -o - "{url}" 2>/dev/null | timg -V -p iterm2 -g {geom} - 2>/dev/null'
             
-            # Süreç grubunda (pgid) başlat
             process = subprocess.Popen(
                 cmd,
                 shell=True,
@@ -63,7 +59,6 @@ def play_stream():
             except (KeyboardInterrupt, EOFError):
                 user_input = 'q'
                 
-            # Enter'a basıldığı an ilgili tüm video/grafik süreçlerini öldür
             try:
                 os.killpg(os.getpgid(process.pid), 9)
             except Exception:
@@ -76,9 +71,8 @@ def play_stream():
                 
         loop_count += 1
 
-
 if __name__ == "__main__":
     try:
         play_stream()
     except Exception as e:
-        print(f"\n[!] Beklenmeyen bir hata oluştu: {e}")
+        print(f"\n[!] Hata oluştu: {e}")
