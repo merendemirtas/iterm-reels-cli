@@ -1,52 +1,83 @@
 import os
+import shutil
 import subprocess
 import sys
+import time
 
-reels_list = [
-    "https://www.instagram.com/reel/DbEB0l_i90Z/",
-    "https://www.instagram.com/reel/DbgJBmjOdn1/",
-    "https://www.instagram.com/reel/DbiPrAXIBae/"
-]
+REELS_FILE = "reels.txt"
 
 def clear_screen():
-    # Terminal ekranını ve geçmiş tamponu tamamen temizler
+    """Terminal ekranını ve geçmiş tamponu tamamen temizler."""
     print("\033c", end="")
 
-def main():
-    for index, url in enumerate(reels_list, start=1):
-        clear_screen()
-        print(f"==================== REELS {index}/{len(reels_list)} ====================")
-        print(" [ENTER] -> Sonraki Video | [q + ENTER] -> Çıkış")
-        print("========================================================\n")
+def load_reels(file_path):
+    """reels.txt dosyasından geçerli Instagram Reels linklerini okur."""
+    if not os.path.exists(file_path):
+        print(f"[!] Hata: '{file_path}' dosyası bulunamadı.")
+        print(f"[+] Lütfen projede '{file_path}' oluşturup linkleri ekleyin.")
+        sys.exit(1)
         
-        # yt-dlp ve timg çıktılarını tam sessiz moda alıyoruz
-        cmd = f'exec yt-dlp -q --no-warnings -o - "{url}" 2>/dev/null | timg -V -p iterm2 -g 70x35 - 2>/dev/null'
+    with open(file_path, "r", encoding="utf-8") as f:
+        links = [line.strip() for line in f if line.strip() and not line.startswith("#")]
         
-        # Süreci bağımsız süreç grubunda başlat (kill edince tamamen kapansın)
-        process = subprocess.Popen(
-            cmd,
-            shell=True,
-            preexec_fn=os.setsid
-        )
+    if not links:
+        print(f"[!] Hata: '{file_path}' dosyasında geçerli link bulunamadı.")
+        sys.exit(1)
         
-        try:
-            user_input = input()
-        except (KeyboardInterrupt, EOFError):
-            user_input = 'q'
-            
-        # Enter'a basıldığı an tüm video/grafik süreçlerini öldür
-        try:
-            os.killpg(os.getpgid(process.pid), 9)
-        except Exception:
-            pass
+    return links
 
-        if user_input.strip().lower() == 'q':
+def get_terminal_geometry():
+    """iTerm2 pencere boyutuna göre timg için uygun piksel/hücre boyutunu hesaplar."""
+    columns, lines = shutil.get_terminal_size((80, 24))
+    # Terminal boyutuna dinamik uyum sağlama (genişlik x yükseklik)
+    width = max(40, int(columns * 0.75))
+    height = max(20, int(lines * 0.75))
+    return f"{width}x{height}"
+
+def play_stream():
+    reels_list = load_reels(REELS_FILE)
+    loop_count = 1
+    
+    while True:
+        for index, url in enumerate(reels_list, start=1):
             clear_screen()
-            print("Reels akışı kapatıldı.")
-            sys.exit(0)
+            geom = get_terminal_geometry()
+            
+            print("=" * 60)
+            print(f" 🎬 iTerm2 Reels CLI | Tur: #{loop_count} | Video: {index}/{len(reels_list)}")
+            print(" 🕹️  [ENTER] -> Sonraki Video | [q + ENTER] -> Çıkış")
+            print("=" * 60 + "\n")
+            
+            # yt-dlp ve timg süreçlerini tam sessiz ve optimize şekilde çalıştır
+            cmd = f'exec yt-dlp -q --no-warnings -o - "{url}" 2>/dev/null | timg -V -p iterm2 -g {geom} - 2>/dev/null'
+            
+            # Süreç grubunda (pgid) başlat
+            process = subprocess.Popen(
+                cmd,
+                shell=True,
+                preexec_fn=os.setsid
+            )
+            
+            try:
+                user_input = input()
+            except (KeyboardInterrupt, EOFError):
+                user_input = 'q'
+                
+            # Enter'a basıldığı an ilgili tüm video/grafik süreçlerini öldür
+            try:
+                os.killpg(os.getpgid(process.pid), 9)
+            except Exception:
+                pass
 
-    clear_screen()
-    print("Listendeki tüm videolar bitti!")
+            if user_input.strip().lower() == 'q':
+                clear_screen()
+                print("👋 Reels akışı kapatıldı.")
+                sys.exit(0)
+                
+        loop_count += 1
 
 if __name__ == "__main__":
-    main()
+    try:
+        play_stream()
+    except Exception as e:
+        print(f"\n[!] Beklenmeyen bir hata oluştu: {e}")
